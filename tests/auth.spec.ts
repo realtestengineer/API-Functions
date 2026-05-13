@@ -6,9 +6,10 @@ const baseUrl = 'https://backend.tallinn-learning.ee'
 const loginEndpoint = '/login/student'
 const ordersEndpoint = '/orders'
 
-let Incorrect_USERNAME
-let Incorrect_PASSWORD
+let Incorrect_USERNAME: string
+let Incorrect_PASSWORD: string
 const incorrectLogin = new Login (
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   Incorrect_USERNAME='bENNY', Incorrect_PASSWORD='J9087YH098'
 )
 
