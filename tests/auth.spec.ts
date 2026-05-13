@@ -1,53 +1,55 @@
 import { expect, test } from '@playwright/test'
 import { Login } from '../dto/login-dto'
+import { test, expect, APIRequestContext } from '@playwright/test'
+import { Login } from '../models/Login'
 
-let loginDto: Login
-const baseUrl = 'https://backend.tallinn-learning.ee'
-const loginEndpoint = '/login/student'
-const ordersEndpoint = '/orders'
+const BASE_URL = 'https://backend.tallinn-learning.ee'
 
-let Incorrect_USERNAME: string
-let Incorrect_PASSWORD: string
-const incorrectLogin = new Login(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  (Incorrect_USERNAME = 'bENNY'),
-  (Incorrect_PASSWORD = 'J9087YH098'),
-)
+const ENDPOINTS = {
+  login: '/login/student',
+  orders: '/orders',
+}
 
-test.describe.serial('Authorization flow', () => {
-  test.beforeAll(() => {
-    loginDto = new Login(process.env['DL_USERNAME']!, process.env['DL_PASSWORD']!)
+// --- Test credentials ---
+const VALID_USERNAME = process.env['DL_USERNAME']!
+const VALID_PASSWORD = process.env['DL_PASSWORD']!
+
+const INVALID_LOGIN = new Login('bENNY', 'J9087YH098')
+
+// --- Helper function ---
+async function getAuthToken(
+  request: APIRequestContext,
+  username: string,
+  password: string,
+): Promise<string> {
+  const response = await request.post(BASE_URL + ENDPOINTS.login, {
+    headers: {
+      'Content-Type': 'application/json',
+      accept: 'application/json',
+    },
+    data: new Login(username, password),
   })
 
-  test('should login and receive authorization token', async ({ request }) => {
-    const response = await request.post(baseUrl + loginEndpoint, {
-      headers: {
-        'Content-Type': 'application/json',
-        accept: 'application/json',
-      },
-      data: loginDto,
-    })
+  expect(response.status()).toBe(200)
 
-    expect(response.status()).toBe(200)
-    const token = await response.text()
+  const token = await response.text()
+  expect(token).toBeTruthy()
+
+  return token
+}
+
+test.describe('Authorization flow', () => {
+  test('should login and receive authorization token', async ({ request }) => {
+    const token = await getAuthToken(request, VALID_USERNAME, VALID_PASSWORD)
+
     console.log('Received token:', token)
-    expect(token).toBeTruthy()
+    expect(token).toBeDefined()
   })
 
   test('should get orders with authorization token', async ({ request }) => {
-    const loginResponse = await request.post(baseUrl + loginEndpoint, {
-      headers: {
-        'Content-Type': 'application/json',
-        accept: 'application/json',
-      },
-      data: loginDto,
-    })
+    const token = await getAuthToken(request, VALID_USERNAME, VALID_PASSWORD)
 
-    expect(loginResponse.status()).toBe(200)
-    const token = await loginResponse.text()
-    expect(token).toBeTruthy()
-
-    const response = await request.get(baseUrl + ordersEndpoint, {
+    const response = await request.get(BASE_URL + ENDPOINTS.orders, {
       headers: {
         accept: '*/*',
         Authorization: `Bearer ${token}`,
@@ -55,29 +57,32 @@ test.describe.serial('Authorization flow', () => {
     })
 
     expect(response.status()).toBe(200)
+
     const orders = await response.json()
     console.log('Orders:', JSON.stringify(orders, null, 2))
+
     expect(orders).toBeTruthy()
   })
-})
 
-test('should not get orders without authorization token', async ({ request }) => {
-  const loginResponse = await request.post(baseUrl + loginEndpoint, {
-    headers: {
-      'Content-Type': 'application/json',
-      accept: 'application/json',
-    },
-    data: incorrectLogin,
+  test('should not get orders with invalid login', async ({ request }) => {
+    const loginResponse = await request.post(BASE_URL + ENDPOINTS.login, {
+      headers: {
+        'Content-Type': 'application/json',
+        accept: 'application/json',
+      },
+      data: INVALID_LOGIN,
+    })
+
+    expect(loginResponse.status()).toBe(401)
   })
 
-  expect(loginResponse.status()).toBe(401)
-  expect(Error).toBeTruthy()
+  test('should not get orders without authorization token', async ({ request }) => {
+    const response = await request.get(BASE_URL + ENDPOINTS.orders, {
+      headers: {
+        accept: '*/*',
+      },
+    })
 
-  const response = await request.get(baseUrl + ordersEndpoint, {
-    headers: {
-      accept: '*/*',
-    },
+    expect(response.status()).toBe(401)
   })
-
-  expect(response.status()).toBe(401)
 })
