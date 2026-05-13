@@ -40,6 +40,9 @@ jobs:
           npx tsc --noEmit
 
       - name: Run Playwright API tests
+        env:
+          DL_USERNAME : ${{secret.DL_USERNAME}}
+          DL_PASSWORD : ${{secret.DL_PASSWORD}}
         run: |
           echo "Running Playwright to execute API tests..."
           npx playwright test    
